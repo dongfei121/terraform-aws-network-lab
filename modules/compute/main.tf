@@ -70,6 +70,35 @@ data "aws_ami" "al2023" {
   }
 }
 
+# -------- IAM (for CKV2_AWS_41) --------
+data "aws_iam_policy_document" "ec2_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ec2_role" {
+  name               = "${var.project}-ec2-role"
+  assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.project}-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
+# -------- Security Groups --------
 resource "aws_security_group" "bastion_sg" {
   name        = "tf-bastion-sg"
   description = "Bastion SG - allow SSH from my current public IP only"
@@ -94,35 +123,6 @@ resource "aws_security_group" "bastion_sg" {
   tags = {
     Name    = "tf-bastion-sg"
     Project = var.project
-  }
-}
-
-resource "aws_key_pair" "lab_key" {
-  key_name   = "tf-lab-key"
-  public_key = var.public_key_openssh
-}
-
-# checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
-resource "aws_instance" "bastion" {
-  ami                         = data.aws_ami.al2023.id
-  instance_type               = "t3.micro"
-  subnet_id                   = var.public_subnet_id
-  vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
-  associate_public_ip_address = true
-  key_name                    = aws_key_pair.lab_key.key_name
-
-  ebs_optimized = true # CKV_AWS_135
-  monitoring    = true # CKV_AWS_126
-
-  metadata_options { # CKV_AWS_79 (IMDSv2)
-    http_endpoint = "enabled"
-    http_tokens   = "required"
-  }
-
-  tags = {
-    Name    = "tf-bastion"
-    Project = var.project
-    Role    = "bastion"
   }
 }
 
@@ -153,6 +153,42 @@ resource "aws_security_group" "private_sg" {
   }
 }
 
+# -------- Key Pair --------
+resource "aws_key_pair" "lab_key" {
+  key_name   = "tf-lab-key"
+  public_key = var.public_key_openssh
+}
+
+# -------- EC2 Instances --------
+# checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
+resource "aws_instance" "bastion" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.micro"
+  subnet_id                   = var.public_subnet_id
+  vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
+  associate_public_ip_address = true
+  key_name                    = aws_key_pair.lab_key.key_name
+
+  # CKV2_AWS_41 (IAM role attached)
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+
+  # CKV_AWS_135 / CKV_AWS_126
+  ebs_optimized = true
+  monitoring    = true
+
+  # CKV_AWS_79 (IMDSv2)
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
+  tags = {
+    Name    = "tf-bastion"
+    Project = var.project
+    Role    = "bastion"
+  }
+}
+
 resource "aws_instance" "private1" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = "t3.micro"
@@ -161,10 +197,15 @@ resource "aws_instance" "private1" {
   associate_public_ip_address = false
   key_name                    = aws_key_pair.lab_key.key_name
 
-  ebs_optimized = true # CKV_AWS_135
-  monitoring    = true # CKV_AWS_126
+  # CKV2_AWS_41 (IAM role attached)
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
-  metadata_options { # CKV_AWS_79 (IMDSv2)
+  # CKV_AWS_135 / CKV_AWS_126
+  ebs_optimized = true
+  monitoring    = true
+
+  # CKV_AWS_79 (IMDSv2)
+  metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
   }
@@ -176,6 +217,7 @@ resource "aws_instance" "private1" {
   }
 }
 
+# -------- Outputs --------
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
 }
