@@ -70,7 +70,10 @@ data "aws_ami" "al2023" {
   }
 }
 
-# -------- IAM (for CKV2_AWS_41) --------
+# -------------------------
+# IAM Role + Instance Profile (CKV2_AWS_41)
+# -------------------------
+
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
@@ -98,14 +101,17 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-# -------- Security Groups --------
+# -------------------------
+# Security Groups
+# -------------------------
+
 resource "aws_security_group" "bastion_sg" {
   name        = "tf-bastion-sg"
   description = "Bastion SG - allow SSH from my current public IP only"
   vpc_id      = var.vpc_id
 
   ingress {
-    description = "SSH from my current public IP"
+    description = "SSH from my IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -113,7 +119,7 @@ resource "aws_security_group" "bastion_sg" {
   }
 
   egress {
-    description = "Allow all outbound"
+    description = "All outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -140,7 +146,7 @@ resource "aws_security_group" "private_sg" {
   }
 
   egress {
-    description = "Allow all outbound"
+    description = "All outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -153,13 +159,19 @@ resource "aws_security_group" "private_sg" {
   }
 }
 
-# -------- Key Pair --------
+# -------------------------
+# Key Pair
+# -------------------------
+
 resource "aws_key_pair" "lab_key" {
   key_name   = "tf-lab-key"
   public_key = var.public_key_openssh
 }
 
-# -------- EC2 Instances --------
+# -------------------------
+# EC2 Instances
+# -------------------------
+
 # checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.al2023.id
@@ -180,6 +192,11 @@ resource "aws_instance" "bastion" {
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
+  }
+
+  # CKV_AWS_8 (EBS encryption)
+  root_block_device {
+    encrypted = true
   }
 
   tags = {
@@ -210,6 +227,11 @@ resource "aws_instance" "private1" {
     http_tokens   = "required"
   }
 
+  # CKV_AWS_8 (EBS encryption)
+  root_block_device {
+    encrypted = true
+  }
+
   tags = {
     Name    = "tf-private-ec2"
     Project = var.project
@@ -217,7 +239,10 @@ resource "aws_instance" "private1" {
   }
 }
 
-# -------- Outputs --------
+# -------------------------
+# Outputs
+# -------------------------
+
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
 }
