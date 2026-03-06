@@ -168,41 +168,59 @@ resource "aws_route_table_association" "private_assoc" {
 # + 1 year retention (CKV_AWS_338)
 # -------------------------
 
-#checkov:skip=CKV_AWS_111: KMS key policy needs wildcard resources in key policy statements (lab/demo)
 data "aws_iam_policy_document" "cw_kms_key_policy" {
-
+  # Admin (account root) - avoid kms:* to satisfy checkov CKV_AWS_109/111
   statement {
-    sid     = "AllowAccountAdmin"
-    effect  = "Allow"
-    actions = ["kms:*"]
+    sid    = "AllowAccountRootKeyAdministration"
+    effect = "Allow"
 
     principals {
       type        = "AWS"
       identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
     }
 
+    actions = [
+      "kms:Create*",
+      "kms:Describe*",
+      "kms:Enable*",
+      "kms:List*",
+      "kms:Put*",
+      "kms:Update*",
+      "kms:Revoke*",
+      "kms:Disable*",
+      "kms:Get*",
+      "kms:Delete*",
+      "kms:TagResource",
+      "kms:UntagResource",
+      "kms:ScheduleKeyDeletion",
+      "kms:CancelKeyDeletion"
+    ]
+
     resources = ["*"]
   }
 
+  # CloudWatch Logs service use of the key
   statement {
     sid    = "AllowCloudWatchLogsUseKey"
     effect = "Allow"
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey",
-    ]
 
     principals {
       type        = "Service"
       identifiers = ["logs.${var.region}.amazonaws.com"]
     }
 
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+
     resources = ["*"]
   }
 }
+
 
 resource "aws_kms_key" "cw_logs" {
   description             = "KMS key for CloudWatch Logs encryption (${var.project})"
