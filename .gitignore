@@ -39,3 +39,7 @@ terraform.rc
 
 # Local-only tfvars
 envs/dev/terraform.tfvars
+
+# Local scratch dirs
+_backup/
+_legacy/
