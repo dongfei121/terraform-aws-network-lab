@@ -171,7 +171,7 @@ resource "aws_route_table_association" "private_assoc" {
 # -------------------------
 
 resource "aws_cloudwatch_log_group" "vpc_flow" {
-  name              = "/aws/vpc/${var.project}-flowlogs"
+  name              = "/aws/vpc/${var.project}/flow-logs"
   retention_in_days = 7
 
   tags = {
@@ -183,6 +183,7 @@ data "aws_iam_policy_document" "vpc_flow_assume" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
+
     principals {
       type        = "Service"
       identifiers = ["vpc-flow-logs.amazonaws.com"]
@@ -195,11 +196,56 @@ resource "aws_iam_role" "vpc_flow_role" {
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_assume.json
 }
 
-data "aws_iam_policy_document" "vpc_flow_policy" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-      "logs:DescribeLogGroups",
-      "logs
+# ✅ 用 jsonencode，彻底避免多行字符串/引号断行导致的 fmt 失败
+resource "aws_iam_role_policy" "vpc_flow_policy" {
+  name = "${var.project}-vpc-flowlogs-policy"
+  role = aws_iam_role.vpc_flow_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "vpc" {
+  vpc_id               = aws_vpc.lab.id
+  traffic_type         = "ALL"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.vpc_flow.arn
+  iam_role_arn         = aws_iam_role.vpc_flow_role.arn
+}
+
+# -------------------------
+# Outputs
+# -------------------------
+
+output "vpc_id" {
+  value = aws_vpc.lab.id
+}
+
+output "public_subnet_ids" {
+  value = aws_subnet.public[*].id
+}
+
+output "private_subnet_ids" {
+  value = aws_subnet.private[*].id
+}
+
+output "igw_id" {
+  value = aws_internet_gateway.igw.id
+}
+
+output "nat_eip" {
+  value = var.enable_nat ? aws_eip.nat[0].public_ip : null
+}
