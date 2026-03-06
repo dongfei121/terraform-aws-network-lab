@@ -1,13 +1,13 @@
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+    aws      = { source = "hashicorp/aws", version = "~> 5.0" }
     external = { source = "hashicorp/external", version = "~> 2.0" }
   }
 }
 
 variable "project" { type = string }
-variable "region"  { type = string }
+variable "region" { type = string }
 
 provider "aws" { region = var.region }
 
@@ -17,9 +17,9 @@ module "network" {
   project              = var.project
   region               = var.region
   vpc_cidr             = "10.10.0.0/16"
-  azs                  = ["us-east-1a","us-east-1b"]
-  public_subnet_cidrs  = ["10.10.10.0/24","10.10.11.0/24"]
-  private_subnet_cidrs = ["10.10.20.0/24","10.10.21.0/24"]
+  azs                  = ["us-east-1a", "us-east-1b"]
+  public_subnet_cidrs  = ["10.10.10.0/24", "10.10.11.0/24"]
+  private_subnet_cidrs = ["10.10.20.0/24", "10.10.21.0/24"]
   enable_nat           = false
 }
 
@@ -33,10 +33,10 @@ module "compute" {
   private_subnet_id = module.network.private_subnet_ids[0]
 }
 
-output "vpc_id"             { value = module.network.vpc_id }
-output "public_subnet_ids"  { value = module.network.public_subnet_ids }
+output "vpc_id" { value = module.network.vpc_id }
+output "public_subnet_ids" { value = module.network.public_subnet_ids }
 output "private_subnet_ids" { value = module.network.private_subnet_ids }
-output "nat_eip"            { value = module.network.nat_eip }
-output "bastion_public_ip"  { value = module.compute.bastion_public_ip }
-output "private1_ip"        { value = module.compute.private1_ip }
-output "ssh_command"        { value = module.compute.ssh_command }
+output "nat_eip" { value = module.network.nat_eip }
+output "bastion_public_ip" { value = module.compute.bastion_public_ip }
+output "private1_ip" { value = module.compute.private1_ip }
+output "ssh_command" { value = module.compute.ssh_command }
