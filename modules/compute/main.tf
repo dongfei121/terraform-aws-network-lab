@@ -92,7 +92,7 @@ resource "aws_security_group" "bastion_sg" {
 
 resource "aws_key_pair" "lab_key" {
   key_name   = "tf-lab-key"
-  public_key = file("${path.module}/../../id_rsa.pub")
+  public_key = var.public_key_openssh
 }
 
 resource "aws_instance" "bastion" {
@@ -166,4 +166,9 @@ output "ssh_command" {
 
 output "my_ip_cidr" {
   value = local.my_ip_cidr
+}
+
+variable "public_key_openssh" {
+  description = "SSH public key content in OpenSSH format (ssh-ed25519 ...)"
+  type        = string
 }

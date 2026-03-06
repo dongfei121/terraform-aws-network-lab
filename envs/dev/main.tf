@@ -5,7 +5,7 @@ terraform {
     external = { source = "hashicorp/external", version = "~> 2.0" }
   }
 }
-
+variable "public_key_openssh" { type = string }
 variable "project" { type = string }
 variable "region" { type = string }
 
@@ -26,11 +26,13 @@ module "network" {
 module "compute" {
   source = "../../modules/compute"
 
-  project           = var.project
-  region            = var.region
-  vpc_id            = module.network.vpc_id
-  public_subnet_id  = module.network.public_subnet_ids[0]
-  private_subnet_id = module.network.private_subnet_ids[0]
+  project            = var.project
+  region             = var.region
+  vpc_id             = module.network.vpc_id
+  public_subnet_id   = module.network.public_subnet_ids[0]
+  private_subnet_id  = module.network.private_subnet_ids[0]
+  public_key_openssh = var.public_key_openssh
+
 }
 
 output "vpc_id" { value = module.network.vpc_id }
