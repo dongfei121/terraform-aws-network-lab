@@ -13,6 +13,10 @@ terraform {
   }
 }
 
+# -------------------------
+# Variables
+# -------------------------
+
 variable "project" { type = string }
 variable "region" { type = string }
 variable "vpc_id" { type = string }
@@ -30,9 +34,17 @@ variable "public_key_openssh" {
   type        = string
 }
 
+# -------------------------
+# Provider
+# -------------------------
+
 provider "aws" {
   region = var.region
 }
+
+# -------------------------
+# Data
+# -------------------------
 
 data "external" "myip" {
   program = [
@@ -60,11 +72,7 @@ data "aws_ami" "al2023" {
 # IAM (CKV2_AWS_41)
 # -------------------------
 
-#checkov:skip=CKV_AWS_356: KMS key policy in lab/demo needs Resource="*" for key usage
-#checkov:skip=CKV_AWS_109: KMS key policy admin permissions acceptable in lab/demo
-#checkov:skip=CKV_AWS_111: KMS key policy write permissions acceptable in lab/demo
-data "aws_iam_policy_document" "cw_kms_key_policy" {
-
+data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -199,6 +207,10 @@ resource "aws_security_group" "private_sg" {
     Project = var.project
   }
 }
+
+# -------------------------
+# Key Pair
+# -------------------------
 
 resource "aws_key_pair" "lab_key" {
   key_name   = "tf-lab-key"
