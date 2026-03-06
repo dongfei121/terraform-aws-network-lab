@@ -13,25 +13,11 @@ terraform {
   }
 }
 
-variable "project" {
-  type = string
-}
-
-variable "region" {
-  type = string
-}
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "public_subnet_id" {
-  type = string
-}
-
-variable "private_subnet_id" {
-  type = string
-}
+variable "project" { type = string }
+variable "region" { type = string }
+variable "vpc_id" { type = string }
+variable "public_subnet_id" { type = string }
+variable "private_subnet_id" { type = string }
 
 variable "bastion_public_ip_cidr" {
   description = "Optional. If empty, auto-detect via external provider."
@@ -52,7 +38,7 @@ data "external" "myip" {
   program = [
     "bash",
     "-lc",
-    "echo '{\"ip\":\"'$(curl -s https://checkip.amazonaws.com | tr -d \"\\n\")'\"}'"
+    "echo '{\"ip\":\"'$(curl -s https://checkip.amazonaws.com | tr -d \"\\n\")'\"}'",
   ]
 }
 
@@ -69,6 +55,10 @@ data "aws_ami" "al2023" {
     values = ["al2023-ami-*-kernel-*-x86_64"]
   }
 }
+
+# -------------------------
+# IAM (CKV2_AWS_41)
+# -------------------------
 
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
@@ -97,6 +87,10 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
+# -------------------------
+# Security Groups
+# -------------------------
+
 resource "aws_security_group" "bastion_sg" {
   name        = "tf-bastion-sg"
   description = "Bastion SG - allow SSH from my current public IP only"
@@ -110,11 +104,37 @@ resource "aws_security_group" "bastion_sg" {
     cidr_blocks = [local.my_ip_cidr]
   }
 
+  # Avoid CKV_AWS_382: do NOT allow all egress (-1) to 0.0.0.0/0
+  # Keep minimal outbound: HTTPS/HTTP + DNS
   egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "HTTPS outbound"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "HTTP outbound"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "DNS outbound (UDP)"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "DNS outbound (TCP)"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -124,10 +144,66 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
+resource "aws_security_group" "private_sg" {
+  name        = "tf-private-sg"
+  description = "Private instance SG - allow SSH from bastion only"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "SSH from bastion SG"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
+
+  # Avoid CKV_AWS_382 here too
+  egress {
+    description = "HTTPS outbound"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "HTTP outbound"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "DNS outbound (UDP)"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "DNS outbound (TCP)"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "tf-private-sg"
+    Project = var.project
+  }
+}
+
 resource "aws_key_pair" "lab_key" {
   key_name   = "tf-lab-key"
   public_key = var.public_key_openssh
 }
+
+# -------------------------
+# EC2 Instances
+# -------------------------
 
 # checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
 resource "aws_instance" "bastion" {
@@ -138,7 +214,7 @@ resource "aws_instance" "bastion" {
   associate_public_ip_address = true
   key_name                    = aws_key_pair.lab_key.key_name
 
-  # CKV2_AWS_41 (IAM role attached)
+  # CKV2_AWS_41
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   # CKV_AWS_135 / CKV_AWS_126
@@ -163,33 +239,6 @@ resource "aws_instance" "bastion" {
   }
 }
 
-resource "aws_security_group" "private_sg" {
-  name        = "tf-private-sg"
-  description = "Private instance SG - allow SSH from bastion only"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "SSH from bastion SG"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.bastion_sg.id]
-  }
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name    = "tf-private-sg"
-    Project = var.project
-  }
-}
-
 resource "aws_instance" "private1" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = "t3.micro"
@@ -198,7 +247,7 @@ resource "aws_instance" "private1" {
   associate_public_ip_address = false
   key_name                    = aws_key_pair.lab_key.key_name
 
-  # CKV2_AWS_41 (IAM role attached)
+  # CKV2_AWS_41
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   # CKV_AWS_135 / CKV_AWS_126
@@ -222,6 +271,10 @@ resource "aws_instance" "private1" {
     Role    = "private"
   }
 }
+
+# -------------------------
+# Outputs
+# -------------------------
 
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
