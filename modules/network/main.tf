@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.5.0"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -60,12 +62,19 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
+# -------------------------
+# Subnets
+# -------------------------
+
 resource "aws_subnet" "public" {
-  count                   = length(var.azs)
-  vpc_id                  = aws_vpc.lab.id
-  availability_zone       = var.azs[count.index]
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  map_public_ip_on_launch = true
+  count             = length(var.azs)
+  vpc_id            = aws_vpc.lab.id
+  availability_zone = var.azs[count.index]
+  cidr_block        = var.public_subnet_cidrs[count.index]
+
+  # CKV_AWS_130: do NOT auto-assign public IP by default
+  # Bastion can still have a public IP via associate_public_ip_address = true
+  map_public_ip_on_launch = false
 
   tags = {
     Name    = "tf-public-${var.azs[count.index]}"
@@ -87,6 +96,10 @@ resource "aws_subnet" "private" {
   }
 }
 
+# -------------------------
+# Route tables (Public)
+# -------------------------
+
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.lab.id
 
@@ -107,6 +120,10 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public.id
 }
 
+# -------------------------
+# NAT (optional)
+# -------------------------
+
 resource "aws_eip" "nat" {
   count  = var.enable_nat ? 1 : 0
   domain = "vpc"
@@ -126,8 +143,6 @@ resource "aws_nat_gateway" "nat" {
     Name    = "tf-natgw"
     Project = var.project
   }
-
-  depends_on = [aws_internet_gateway.igw]
 }
 
 resource "aws_route_table" "private" {
@@ -151,18 +166,40 @@ resource "aws_route_table_association" "private_assoc" {
   route_table_id = aws_route_table.private[0].id
 }
 
-output "vpc_id" {
-  value = aws_vpc.lab.id
+# -------------------------
+# VPC Flow Logs (CKV2_AWS_11)
+# -------------------------
+
+resource "aws_cloudwatch_log_group" "vpc_flow" {
+  name              = "/aws/vpc/${var.project}-flowlogs"
+  retention_in_days = 7
+
+  tags = {
+    Project = var.project
+  }
 }
 
-output "public_subnet_ids" {
-  value = [for s in aws_subnet.public : s.id]
+data "aws_iam_policy_document" "vpc_flow_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
 }
 
-output "private_subnet_ids" {
-  value = [for s in aws_subnet.private : s.id]
+resource "aws_iam_role" "vpc_flow_role" {
+  name               = "${var.project}-vpc-flowlogs-role"
+  assume_role_policy = data.aws_iam_policy_document.vpc_flow_assume.json
 }
 
-output "nat_eip" {
-  value = var.enable_nat ? aws_eip.nat[0].public_ip : null
-}
+data "aws_iam_policy_document" "vpc_flow_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs
