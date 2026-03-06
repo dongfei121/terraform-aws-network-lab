@@ -1,31 +1,38 @@
 # Terraform
 **/.terraform/*
 **/.terraform.lock.hcl
-**/*.tfstate
-**/*.tfstate.*
-**/*.tfplan
-**/crash.log
-**/crash.*.log
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
 
-# Local overrides
-**/*_override.tf
-**/*_override.tf.json
-**/override.tf
-**/override.tf.json
+# Terraform vars (可能包含敏感信息；你现在用 tfvars 放公钥也可以保留，如果不想公开就忽略)
+# *.tfvars
+# *.tfvars.json
 
-# Sensitive keys (DO NOT COMMIT)
-id_rsa
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Plan files
+*.tfplan
+*.plan
+
+# CLI config
+.terraformrc
+terraform.rc
+
+# Keys / secrets (非常重要)
 **/id_rsa
-*.pem
-*.key
+**/id_rsa.pub
+**/terraform_lab_id_rsa
+**/terraform_lab_id_rsa.pub
+**/*.pem
+**/*.key
 
-# Editor/OS
+# OS/Editor
 .DS_Store
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# Backups
-_backup/
-_legacy/
