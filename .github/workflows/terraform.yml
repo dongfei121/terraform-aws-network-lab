@@ -2,9 +2,9 @@ name: terraform
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   fmt-validate:
@@ -17,14 +17,19 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.6.6"
+          terraform_version: "1.14.6"
           terraform_wrapper: false
 
-      - name: Terraform fmt (check)
-        run: terraform fmt -check -recursive
+      # fmt: 只检查真正的 tf 目录
+      - name: Terraform fmt (check) - modules
+        run: terraform fmt -check -recursive modules
 
+      - name: Terraform fmt (check) - envs
+        run: terraform fmt -check -recursive envs
+
+      # validate: 只在 entrypoint 环境跑
       - name: Terraform init (no backend) + validate (envs/dev)
         working-directory: envs/dev
         run: |
-          terraform init -backend=false
-          terraform validate
+          terraform init -backend=false -no-color
+          terraform validate -no-color
