@@ -1,0 +1,31 @@
+# Terraform
+**/.terraform/*
+**/.terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/crash.log
+**/crash.*.log
+
+# Local overrides
+**/*_override.tf
+**/*_override.tf.json
+**/override.tf
+**/override.tf.json
+
+# Sensitive keys (DO NOT COMMIT)
+id_rsa
+**/id_rsa
+*.pem
+*.key
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups
+_backup/
+_legacy/
