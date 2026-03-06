@@ -53,6 +53,17 @@ resource "aws_vpc" "lab" {
   }
 }
 
+# CKV2_AWS_12: Restrict ALL traffic on the default security group
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.lab.id
+
+  # No ingress / egress blocks => no rules
+  tags = {
+    Name    = "tf-default-sg-locked"
+    Project = var.project
+  }
+}
+
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.lab.id
 
@@ -196,7 +207,8 @@ resource "aws_iam_role" "vpc_flow_role" {
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_assume.json
 }
 
-# ✅ 用 jsonencode，彻底避免多行字符串/引号断行导致的 fmt 失败
+# CKV_AWS_290: Do NOT allow unconstrained write to "*"
+# Scope permissions to THIS log group only (and its streams)
 resource "aws_iam_role_policy" "vpc_flow_policy" {
   name = "${var.project}-vpc-flowlogs-policy"
   role = aws_iam_role.vpc_flow_role.id
@@ -205,12 +217,20 @@ resource "aws_iam_role_policy" "vpc_flow_policy" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "WriteFlowLogsToSpecificLogGroup"
         Effect = "Allow"
         Action = [
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
+        ]
+        Resource = "${aws_cloudwatch_log_group.vpc_flow.arn}:*"
+      },
+      {
+        Sid    = "DescribeLogGroups"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
         ]
         Resource = "*"
       }
