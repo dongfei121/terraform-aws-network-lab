@@ -7,8 +7,11 @@ on:
     branches: ["main"]
 
 jobs:
-  fmt-validate:
+  ci:
     runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
 
     steps:
       - name: Checkout
@@ -20,16 +23,28 @@ jobs:
           terraform_version: "1.14.6"
           terraform_wrapper: false
 
-      # fmt: 只检查真正的 tf 目录
-      - name: Terraform fmt (check) - modules
-        run: terraform fmt -check -recursive modules
+      - name: Terraform fmt (check)
+        run: terraform fmt -check -recursive -diff
 
-      - name: Terraform fmt (check) - envs
-        run: terraform fmt -check -recursive envs
-
-      # validate: 只在 entrypoint 环境跑
-      - name: Terraform init (no backend) + validate (envs/dev)
-        working-directory: envs/dev
+      - name: Terraform init + validate (envs/dev)
         run: |
-          terraform init -backend=false -no-color
-          terraform validate -no-color
+          terraform -chdir=envs/dev init -backend=false -no-color
+          terraform -chdir=envs/dev validate -no-color
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.55.0
+
+      - name: TFLint (envs/dev)
+        run: |
+          cd envs/dev
+          tflint --init
+          tflint -f compact
+
+      - name: Checkov (IaC security scan)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          quiet: true
+          framework: terraform
