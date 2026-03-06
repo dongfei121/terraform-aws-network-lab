@@ -95,6 +95,8 @@ resource "aws_key_pair" "lab_key" {
   public_key = var.public_key_openssh
 }
 
+# checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
+
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = "t3.micro"
@@ -103,12 +105,21 @@ resource "aws_instance" "bastion" {
   associate_public_ip_address = true
   key_name                    = aws_key_pair.lab_key.key_name
 
+  ebs_optimized = true      # CKV_AWS_135
+  monitoring    = true      # CKV_AWS_126
+
+  metadata_options {         # CKV_AWS_79
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
   tags = {
     Name    = "tf-bastion"
     Project = var.project
     Role    = "bastion"
   }
 }
+
 
 resource "aws_security_group" "private_sg" {
   name        = "tf-private-sg"
