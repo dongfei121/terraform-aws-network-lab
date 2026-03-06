@@ -57,7 +57,6 @@ resource "aws_vpc" "lab" {
 resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.lab.id
 
-  # No ingress / egress blocks => no rules
   tags = {
     Name    = "tf-default-sg-locked"
     Project = var.project
@@ -83,8 +82,7 @@ resource "aws_subnet" "public" {
   availability_zone = var.azs[count.index]
   cidr_block        = var.public_subnet_cidrs[count.index]
 
-  # CKV_AWS_130: do NOT auto-assign public IP by default
-  # Bastion can still have a public IP via associate_public_ip_address = true
+  # CKV_AWS_130
   map_public_ip_on_launch = false
 
   tags = {
@@ -178,12 +176,64 @@ resource "aws_route_table_association" "private_assoc" {
 }
 
 # -------------------------
-# VPC Flow Logs (CKV2_AWS_11)
+# VPC Flow Logs (CKV2_AWS_11) + KMS (CKV_AWS_158) + 1yr retention (CKV_AWS_338)
 # -------------------------
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+resource "aws_kms_key" "cw_logs" {
+  description             = "KMS key for CloudWatch Logs encryption (${var.project})"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # Allow account admins full control
+      {
+        Sid      = "AllowAccountAdmin"
+        Effect   = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      # Allow CloudWatch Logs service to use the key
+      {
+        Sid    = "AllowCloudWatchLogsUse"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Project = var.project
+  }
+}
+
+resource "aws_kms_alias" "cw_logs" {
+  name          = "alias/${var.project}-cw-logs"
+  target_key_id = aws_kms_key.cw_logs.key_id
+}
 
 resource "aws_cloudwatch_log_group" "vpc_flow" {
   name              = "/aws/vpc/${var.project}/flow-logs"
-  retention_in_days = 7
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.cw_logs.arn
 
   tags = {
     Project = var.project
@@ -207,7 +257,6 @@ resource "aws_iam_role" "vpc_flow_role" {
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_assume.json
 }
 
-# CKV_AWS_290: Do NOT allow unconstrained write to "*"
 # Scope permissions to THIS log group only (and its streams)
 resource "aws_iam_role_policy" "vpc_flow_policy" {
   name = "${var.project}-vpc-flowlogs-policy"
@@ -260,10 +309,6 @@ output "public_subnet_ids" {
 
 output "private_subnet_ids" {
   value = aws_subnet.private[*].id
-}
-
-output "igw_id" {
-  value = aws_internet_gateway.igw.id
 }
 
 output "nat_eip" {
