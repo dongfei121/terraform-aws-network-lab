@@ -166,9 +166,9 @@ resource "aws_route_table_association" "private_assoc" {
 # VPC Flow Logs (CKV2_AWS_11)
 # + CloudWatch Log Group KMS encryption (CKV_AWS_158)
 # + 1 year retention (CKV_AWS_338)
-# + IAM policy least privilege (CKV_AWS_290)
 # -------------------------
 
+# checkov:skip=CKV_AWS_111: KMS key policy requires wildcard resource in key policy statements (acceptable for lab/demo)
 data "aws_iam_policy_document" "cw_kms_key_policy" {
   statement {
     sid     = "AllowAccountAdmin"
@@ -241,11 +241,11 @@ resource "aws_iam_role" "vpc_flow_role" {
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_assume.json
 }
 
-# Least-privilege policy (no Resource="*") for CKV_AWS_290
 resource "aws_iam_role_policy" "vpc_flow_policy" {
   name = "${var.project}-vpc-flowlogs-policy"
   role = aws_iam_role.vpc_flow_role.id
 
+  # least privilege: scope to the single log group
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -294,10 +294,6 @@ output "public_subnet_ids" {
 
 output "private_subnet_ids" {
   value = aws_subnet.private[*].id
-}
-
-output "igw_id" {
-  value = aws_internet_gateway.igw.id
 }
 
 output "nat_eip" {
