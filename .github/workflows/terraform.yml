@@ -45,9 +45,8 @@ jobs:
       - name: Checkov (IaC security scan)
         uses: bridgecrewio/checkov-action@v12
         with:
-        directory: .
-        quiet: true
-        framework: terraform
-        # Lab/demo: allow bastion public IP + accept KMS key-policy tradeoffs
-        skip_check: CKV_AWS_88,CKV_AWS_356,CKV_AWS_109,CKV_AWS_111
-
+          directory: .
+          quiet: true
+          framework: terraform
+          # Lab/demo: allow bastion public IP + accept KMS key-policy tradeoffs
+          skip_check: CKV_AWS_88,CKV_AWS_356,CKV_AWS_109,CKV_AWS_111
