@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.5.0"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -35,6 +37,11 @@ variable "bastion_public_ip_cidr" {
   description = "Optional. If empty, auto-detect via external provider."
   type        = string
   default     = ""
+}
+
+variable "public_key_openssh" {
+  description = "SSH public key content in OpenSSH format (ssh-ed25519 ...)"
+  type        = string
 }
 
 provider "aws" {
@@ -96,7 +103,6 @@ resource "aws_key_pair" "lab_key" {
 }
 
 # checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
-
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = "t3.micro"
@@ -105,10 +111,10 @@ resource "aws_instance" "bastion" {
   associate_public_ip_address = true
   key_name                    = aws_key_pair.lab_key.key_name
 
-  ebs_optimized = true      # CKV_AWS_135
-  monitoring    = true      # CKV_AWS_126
+  ebs_optimized = true # CKV_AWS_135
+  monitoring    = true # CKV_AWS_126
 
-  metadata_options {         # CKV_AWS_79
+  metadata_options { # CKV_AWS_79 (IMDSv2)
     http_endpoint = "enabled"
     http_tokens   = "required"
   }
@@ -119,7 +125,6 @@ resource "aws_instance" "bastion" {
     Role    = "bastion"
   }
 }
-
 
 resource "aws_security_group" "private_sg" {
   name        = "tf-private-sg"
@@ -156,6 +161,14 @@ resource "aws_instance" "private1" {
   associate_public_ip_address = false
   key_name                    = aws_key_pair.lab_key.key_name
 
+  ebs_optimized = true # CKV_AWS_135
+  monitoring    = true # CKV_AWS_126
+
+  metadata_options { # CKV_AWS_79 (IMDSv2)
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
   tags = {
     Name    = "tf-private-ec2"
     Project = var.project
@@ -177,9 +190,4 @@ output "ssh_command" {
 
 output "my_ip_cidr" {
   value = local.my_ip_cidr
-}
-
-variable "public_key_openssh" {
-  description = "SSH public key content in OpenSSH format (ssh-ed25519 ...)"
-  type        = string
 }
