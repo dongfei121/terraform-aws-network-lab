@@ -168,8 +168,9 @@ resource "aws_route_table_association" "private_assoc" {
 # + 1 year retention (CKV_AWS_338)
 # -------------------------
 
-# checkov:skip=CKV_AWS_111: KMS key policy requires wildcard resource in key policy statements (acceptable for lab/demo)
+#checkov:skip=CKV_AWS_111: KMS key policy needs wildcard resources in key policy statements (lab/demo)
 data "aws_iam_policy_document" "cw_kms_key_policy" {
+
   statement {
     sid     = "AllowAccountAdmin"
     effect  = "Allow"
