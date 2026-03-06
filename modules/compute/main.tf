@@ -70,10 +70,6 @@ data "aws_ami" "al2023" {
   }
 }
 
-# -------------------------
-# IAM Role + Instance Profile (CKV2_AWS_41)
-# -------------------------
-
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     effect  = "Allow"
@@ -101,17 +97,13 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-# -------------------------
-# Security Groups
-# -------------------------
-
 resource "aws_security_group" "bastion_sg" {
   name        = "tf-bastion-sg"
   description = "Bastion SG - allow SSH from my current public IP only"
   vpc_id      = var.vpc_id
 
   ingress {
-    description = "SSH from my IP"
+    description = "SSH from my current public IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -119,7 +111,7 @@ resource "aws_security_group" "bastion_sg" {
   }
 
   egress {
-    description = "All outbound"
+    description = "Allow all outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -132,45 +124,10 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
-resource "aws_security_group" "private_sg" {
-  name        = "tf-private-sg"
-  description = "Private instance SG - allow SSH from bastion only"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "SSH from bastion SG"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.bastion_sg.id]
-  }
-
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name    = "tf-private-sg"
-    Project = var.project
-  }
-}
-
-# -------------------------
-# Key Pair
-# -------------------------
-
 resource "aws_key_pair" "lab_key" {
   key_name   = "tf-lab-key"
   public_key = var.public_key_openssh
 }
-
-# -------------------------
-# EC2 Instances
-# -------------------------
 
 # checkov:skip=CKV_AWS_88: Bastion host requires a public IP for SSH access (lab/demo)
 resource "aws_instance" "bastion" {
@@ -206,6 +163,33 @@ resource "aws_instance" "bastion" {
   }
 }
 
+resource "aws_security_group" "private_sg" {
+  name        = "tf-private-sg"
+  description = "Private instance SG - allow SSH from bastion only"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "SSH from bastion SG"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
+
+  egress {
+    description = "Allow all outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name    = "tf-private-sg"
+    Project = var.project
+  }
+}
+
 resource "aws_instance" "private1" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = "t3.micro"
@@ -238,10 +222,6 @@ resource "aws_instance" "private1" {
     Role    = "private"
   }
 }
-
-# -------------------------
-# Outputs
-# -------------------------
 
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
