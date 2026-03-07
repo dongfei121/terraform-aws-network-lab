@@ -1,43 +1,103 @@
 # Terraform AWS Cloud Network Lab (Multi-AZ)
 
-Production-style AWS networking lab built with Terraform (Cloud9 / AWS Academy friendly).
+A modular, production-style AWS networking lab built with Terraform.  
+Designed for **Cloud9 / AWS Academy / Vocareum-style lab environments**, with a focus on:
 
-## What’s inside
-- VPC: 10.10.0.0/16
-- 2× Public subnets (Multi-AZ)
-- 2× Private subnets (Multi-AZ)
-- Internet Gateway + Public route table
-- Optional NAT Gateway (costly) controlled by `enable_nat`
-- Bastion host (public)
-- Private EC2 (private subnet) reachable via bastion
+- reusable Terraform modules
+- clean environment separation
+- cost awareness
+- CI checks with GitHub Actions
+- practical AWS networking fundamentals
 
-## Repo structure
-- modules/
-  - network/  (VPC, subnets, IGW, route tables, NAT optional)
-  - compute/  (bastion, private instance, SGs, key pair)
-- envs/
-  - dev/      (entrypoint)
+---
 
-## Daily commands
-Run from envs/dev:
+## Architecture diagram
 
-terraform init
-terraform plan
-terraform apply
+```text
+                           Internet
+                               |
+                               |
+                        +-------------+
+                        |     IGW     |
+                        +-------------+
+                               |
+                 +-------------------------------+
+                 |            VPC                |
+                 |         10.10.0.0/16         |
+                 |                               |
+                 |   +-----------------------+   |
+                 |   |   Public Subnets      |   |
+                 |   |  10.10.10.0/24        |   |
+                 |   |  10.10.11.0/24        |   |
+                 |   |                       |   |
+                 |   |  Bastion EC2         |   |
+                 |   +-----------------------+   |
+                 |               |               |
+                 |               | SSH           |
+                 |               v               |
+                 |   +-----------------------+   |
+                 |   |   Private Subnets     |   |
+                 |   |  10.10.20.0/24        |   |
+                 |   |  10.10.21.0/24        |   |
+                 |   |                       |   |
+                 |   |  Private EC2         |   |
+                 |   +-----------------------+   |
+                 |                               |
+                 |   Optional NAT Gateway        |
+                 |   (enable_nat = true/false)   |
+                 +-------------------------------+
 
-## Cost control: disable NAT
-In envs/dev/main.tf set:
-enable_nat = false
+                 VPC Flow Logs -> CloudWatch Logs -> KMS Encryption
 
-Then:
-terraform plan
-terraform apply
 
-Note: With NAT disabled, private instances will not have outbound internet access.
+This project provisions a small AWS environment with:
 
-## Notes for restricted lab accounts
-Some lab accounts may block EIP release/disassociate. If an EIP becomes “stuck”
-but is not associated with any ENI, you can remove it from Terraform state to
-keep workflows unblocked:
+- **1 VPC**: `10.10.0.0/16`
+- **2 public subnets** across 2 Availability Zones
+- **2 private subnets** across 2 Availability Zones
+- **Internet Gateway**
+- **Public route table**
+- **Optional NAT Gateway** controlled by `enable_nat`
+- **Bastion EC2 instance** in a public subnet
+- **Private EC2 instance** in a private subnet
+- **VPC Flow Logs** to CloudWatch Logs
+- **KMS-encrypted CloudWatch Log Group**
+- **IAM instance profile** attached to EC2 instances
+- **Security groups** with restricted ingress / controlled egress
 
-terraform state rm module.network.aws_eip.nat[0]
+---
+
+## Project structure
+
+```text
+.
+├── modules
+│   ├── network
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── compute
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
+├── envs
+│   └── dev
+│       ├── main.tf
+│       ├── moved.tf
+│       └── terraform.tfvars
+├── .github
+│   └── workflows
+│       └── terraform.yml
+└── README.md
+
+```md
+## Project highlights
+
+- Modular Terraform design with separate `network` and `compute` modules
+- Multi-AZ public/private subnet layout
+- Bastion-based access to private EC2
+- Optional NAT Gateway for cost control
+- VPC Flow Logs enabled with CloudWatch + KMS encryption
+- IAM instance profile attached to EC2 instances
+- Security-minded defaults (IMDSv2, encrypted root volumes, controlled egress)
+- CI checks with GitHub Actions, TFLint, and Checkov
