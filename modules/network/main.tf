@@ -9,6 +9,7 @@ terraform {
   }
 }
 
+<<<<<<< HEAD
 variable "project" { type = string }
 variable "region" { type = string }
 variable "vpc_cidr" { type = string }
@@ -21,12 +22,26 @@ variable "enable_nat" {
   default = true
 }
 
+=======
+>>>>>>> 4f2ce27 (refactor: productize network module)
 provider "aws" {
   region = var.region
 }
 
 data "aws_caller_identity" "current" {}
 
+<<<<<<< HEAD
+=======
+locals {
+  common_tags = merge(
+    {
+      Project = var.project
+    },
+    var.tags
+  )
+}
+
+>>>>>>> 4f2ce27 (refactor: productize network module)
 # -------------------------
 # VPC
 # -------------------------
@@ -36,29 +51,30 @@ resource "aws_vpc" "lab" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = {
-    Name    = "tf-lab-vpc"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-lab-vpc"
+  })
 }
 
+<<<<<<< HEAD
 # CKV2_AWS_12: lock down default SG (no ingress/egress)
+=======
+# Lock down the default SG
+>>>>>>> 4f2ce27 (refactor: productize network module)
 resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.lab.id
 
-  tags = {
-    Name    = "tf-default-sg-locked"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-default-sg-locked"
+  })
 }
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.lab.id
 
-  tags = {
-    Name    = "tf-lab-igw"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-lab-igw"
+  })
 }
 
 # -------------------------
@@ -70,13 +86,16 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.lab.id
   availability_zone       = var.azs[count.index]
   cidr_block              = var.public_subnet_cidrs[count.index]
+<<<<<<< HEAD
   map_public_ip_on_launch = false # CKV_AWS_130
+=======
+  map_public_ip_on_launch = false
+>>>>>>> 4f2ce27 (refactor: productize network module)
 
-  tags = {
-    Name    = "tf-public-${var.azs[count.index]}"
-    Tier    = "public"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-public-${var.azs[count.index]}"
+    Tier = "public"
+  })
 }
 
 resource "aws_subnet" "private" {
@@ -85,15 +104,14 @@ resource "aws_subnet" "private" {
   availability_zone = var.azs[count.index]
   cidr_block        = var.private_subnet_cidrs[count.index]
 
-  tags = {
-    Name    = "tf-private-${var.azs[count.index]}"
-    Tier    = "private"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-private-${var.azs[count.index]}"
+    Tier = "private"
+  })
 }
 
 # -------------------------
-# Route tables (Public)
+# Public routing
 # -------------------------
 
 resource "aws_route_table" "public" {
@@ -104,10 +122,9 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.igw.id
   }
 
-  tags = {
-    Name    = "tf-public-rt"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-public-rt"
+  })
 }
 
 resource "aws_route_table_association" "public_assoc" {
@@ -117,17 +134,16 @@ resource "aws_route_table_association" "public_assoc" {
 }
 
 # -------------------------
-# NAT (optional)
+# NAT / private routing
 # -------------------------
 
 resource "aws_eip" "nat" {
   count  = var.enable_nat ? 1 : 0
   domain = "vpc"
 
-  tags = {
-    Name    = "tf-nat-eip"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-nat-eip"
+  })
 }
 
 resource "aws_nat_gateway" "nat" {
@@ -135,10 +151,9 @@ resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
 
-  tags = {
-    Name    = "tf-natgw"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-natgw"
+  })
 }
 
 resource "aws_route_table" "private" {
@@ -150,10 +165,9 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.nat[0].id
   }
 
-  tags = {
-    Name    = "tf-private-rt"
-    Project = var.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "tf-private-rt"
+  })
 }
 
 resource "aws_route_table_association" "private_assoc" {
@@ -163,6 +177,7 @@ resource "aws_route_table_association" "private_assoc" {
 }
 
 # -------------------------
+<<<<<<< HEAD
 # VPC Flow Logs (CKV2_AWS_11)
 # + CloudWatch Log Group KMS encryption (CKV_AWS_158)
 # + 1 year retention (CKV_AWS_338)
@@ -221,6 +236,64 @@ data "aws_iam_policy_document" "cw_kms_key_policy" {
   }
 }
 
+=======
+# VPC Flow Logs
+# -------------------------
+
+#checkov:skip=CKV_AWS_356: KMS key policy in lab/demo needs wildcard resources for key policy usage
+#checkov:skip=CKV_AWS_109: KMS key policy admin permissions acceptable in lab/demo
+#checkov:skip=CKV_AWS_111: KMS key policy write permissions acceptable in lab/demo
+data "aws_iam_policy_document" "cw_kms_key_policy" {
+  statement {
+    sid    = "AllowAccountRootKeyAdministration"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions = [
+      "kms:Create*",
+      "kms:Describe*",
+      "kms:Enable*",
+      "kms:List*",
+      "kms:Put*",
+      "kms:Update*",
+      "kms:Revoke*",
+      "kms:Disable*",
+      "kms:Get*",
+      "kms:Delete*",
+      "kms:TagResource",
+      "kms:UntagResource",
+      "kms:ScheduleKeyDeletion",
+      "kms:CancelKeyDeletion"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowCloudWatchLogsUseKey"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.region}.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+
+    resources = ["*"]
+  }
+}
+>>>>>>> 4f2ce27 (refactor: productize network module)
 
 resource "aws_kms_key" "cw_logs" {
   description             = "KMS key for CloudWatch Logs encryption (${var.project})"
@@ -228,19 +301,21 @@ resource "aws_kms_key" "cw_logs" {
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.cw_kms_key_policy.json
 
+<<<<<<< HEAD
   tags = {
     Project = var.project
   }
+=======
+  tags = local.common_tags
+>>>>>>> 4f2ce27 (refactor: productize network module)
 }
 
 resource "aws_cloudwatch_log_group" "vpc_flow" {
   name              = "/aws/vpc/${var.project}/flow-logs"
-  retention_in_days = 365
+  retention_in_days = var.flow_logs_retention_days
   kms_key_id        = aws_kms_key.cw_logs.arn
 
-  tags = {
-    Project = var.project
-  }
+  tags = local.common_tags
 }
 
 data "aws_iam_policy_document" "vpc_flow_assume" {
@@ -292,29 +367,17 @@ resource "aws_flow_log" "vpc" {
   log_destination_type = "cloud-watch-logs"
   log_destination      = aws_cloudwatch_log_group.vpc_flow.arn
   iam_role_arn         = aws_iam_role.vpc_flow_role.arn
+<<<<<<< HEAD
 
   tags = {
     Name    = "${var.project}-vpc-flowlogs"
     Project = var.project
   }
 }
+=======
+>>>>>>> 4f2ce27 (refactor: productize network module)
 
-# -------------------------
-# Outputs
-# -------------------------
-
-output "vpc_id" {
-  value = aws_vpc.lab.id
-}
-
-output "public_subnet_ids" {
-  value = aws_subnet.public[*].id
-}
-
-output "private_subnet_ids" {
-  value = aws_subnet.private[*].id
-}
-
-output "nat_eip" {
-  value = var.enable_nat ? aws_eip.nat[0].public_ip : null
+  tags = merge(local.common_tags, {
+    Name = "${var.project}-vpc-flowlogs"
+  })
 }
