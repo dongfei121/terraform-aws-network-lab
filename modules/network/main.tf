@@ -9,29 +9,12 @@ terraform {
   }
 }
 
-<<<<<<< HEAD
-variable "project" { type = string }
-variable "region" { type = string }
-variable "vpc_cidr" { type = string }
-variable "azs" { type = list(string) }
-variable "public_subnet_cidrs" { type = list(string) }
-variable "private_subnet_cidrs" { type = list(string) }
-
-variable "enable_nat" {
-  type    = bool
-  default = true
-}
-
-=======
->>>>>>> 4f2ce27 (refactor: productize network module)
 provider "aws" {
   region = var.region
 }
 
 data "aws_caller_identity" "current" {}
 
-<<<<<<< HEAD
-=======
 locals {
   common_tags = merge(
     {
@@ -41,7 +24,6 @@ locals {
   )
 }
 
->>>>>>> 4f2ce27 (refactor: productize network module)
 # -------------------------
 # VPC
 # -------------------------
@@ -56,11 +38,7 @@ resource "aws_vpc" "lab" {
   })
 }
 
-<<<<<<< HEAD
-# CKV2_AWS_12: lock down default SG (no ingress/egress)
-=======
 # Lock down the default SG
->>>>>>> 4f2ce27 (refactor: productize network module)
 resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.lab.id
 
@@ -86,11 +64,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.lab.id
   availability_zone       = var.azs[count.index]
   cidr_block              = var.public_subnet_cidrs[count.index]
-<<<<<<< HEAD
-  map_public_ip_on_launch = false # CKV_AWS_130
-=======
   map_public_ip_on_launch = false
->>>>>>> 4f2ce27 (refactor: productize network module)
 
   tags = merge(local.common_tags, {
     Name = "tf-public-${var.azs[count.index]}"
@@ -177,72 +151,9 @@ resource "aws_route_table_association" "private_assoc" {
 }
 
 # -------------------------
-<<<<<<< HEAD
-# VPC Flow Logs (CKV2_AWS_11)
-# + CloudWatch Log Group KMS encryption (CKV_AWS_158)
-# + 1 year retention (CKV_AWS_338)
-# -------------------------
-
-data "aws_iam_policy_document" "cw_kms_key_policy" {
-  # Admin (account root) - avoid kms:* to satisfy checkov CKV_AWS_109/111
-  statement {
-    sid    = "AllowAccountRootKeyAdministration"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
-    }
-
-    actions = [
-      "kms:Create*",
-      "kms:Describe*",
-      "kms:Enable*",
-      "kms:List*",
-      "kms:Put*",
-      "kms:Update*",
-      "kms:Revoke*",
-      "kms:Disable*",
-      "kms:Get*",
-      "kms:Delete*",
-      "kms:TagResource",
-      "kms:UntagResource",
-      "kms:ScheduleKeyDeletion",
-      "kms:CancelKeyDeletion"
-    ]
-
-    resources = ["*"]
-  }
-
-  # CloudWatch Logs service use of the key
-  statement {
-    sid    = "AllowCloudWatchLogsUseKey"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["logs.${var.region}.amazonaws.com"]
-    }
-
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey"
-    ]
-
-    resources = ["*"]
-  }
-}
-
-=======
 # VPC Flow Logs
 # -------------------------
 
-#checkov:skip=CKV_AWS_356: KMS key policy in lab/demo needs wildcard resources for key policy usage
-#checkov:skip=CKV_AWS_109: KMS key policy admin permissions acceptable in lab/demo
-#checkov:skip=CKV_AWS_111: KMS key policy write permissions acceptable in lab/demo
 data "aws_iam_policy_document" "cw_kms_key_policy" {
   statement {
     sid    = "AllowAccountRootKeyAdministration"
@@ -293,7 +204,6 @@ data "aws_iam_policy_document" "cw_kms_key_policy" {
     resources = ["*"]
   }
 }
->>>>>>> 4f2ce27 (refactor: productize network module)
 
 resource "aws_kms_key" "cw_logs" {
   description             = "KMS key for CloudWatch Logs encryption (${var.project})"
@@ -301,13 +211,7 @@ resource "aws_kms_key" "cw_logs" {
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.cw_kms_key_policy.json
 
-<<<<<<< HEAD
-  tags = {
-    Project = var.project
-  }
-=======
   tags = local.common_tags
->>>>>>> 4f2ce27 (refactor: productize network module)
 }
 
 resource "aws_cloudwatch_log_group" "vpc_flow" {
@@ -367,15 +271,6 @@ resource "aws_flow_log" "vpc" {
   log_destination_type = "cloud-watch-logs"
   log_destination      = aws_cloudwatch_log_group.vpc_flow.arn
   iam_role_arn         = aws_iam_role.vpc_flow_role.arn
-<<<<<<< HEAD
-
-  tags = {
-    Name    = "${var.project}-vpc-flowlogs"
-    Project = var.project
-  }
-}
-=======
->>>>>>> 4f2ce27 (refactor: productize network module)
 
   tags = merge(local.common_tags, {
     Name = "${var.project}-vpc-flowlogs"
