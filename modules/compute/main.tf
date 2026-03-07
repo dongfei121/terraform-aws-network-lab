@@ -13,38 +13,9 @@ terraform {
   }
 }
 
-# -------------------------
-# Variables
-# -------------------------
-
-variable "project" { type = string }
-variable "region" { type = string }
-variable "vpc_id" { type = string }
-variable "public_subnet_id" { type = string }
-variable "private_subnet_id" { type = string }
-
-variable "bastion_public_ip_cidr" {
-  description = "Optional. If empty, auto-detect via external provider."
-  type        = string
-  default     = ""
-}
-
-variable "public_key_openssh" {
-  description = "SSH public key content in OpenSSH format (ssh-ed25519 ...)"
-  type        = string
-}
-
-# -------------------------
-# Provider
-# -------------------------
-
 provider "aws" {
   region = var.region
 }
-
-# -------------------------
-# Data
-# -------------------------
 
 data "external" "myip" {
   program = [
@@ -116,8 +87,6 @@ resource "aws_security_group" "bastion_sg" {
     cidr_blocks = [local.my_ip_cidr]
   }
 
-  # Avoid CKV_AWS_382: do NOT allow all egress (-1) to 0.0.0.0/0
-  # Keep minimal outbound: HTTPS/HTTP + DNS
   egress {
     description = "HTTPS outbound"
     from_port   = 443
@@ -169,7 +138,6 @@ resource "aws_security_group" "private_sg" {
     security_groups = [aws_security_group.bastion_sg.id]
   }
 
-  # Avoid CKV_AWS_382 here too
   egress {
     description = "HTTPS outbound"
     from_port   = 443
@@ -229,21 +197,16 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
   associate_public_ip_address = true
   key_name                    = aws_key_pair.lab_key.key_name
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
 
-  # CKV2_AWS_41
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-
-  # CKV_AWS_135 / CKV_AWS_126
   ebs_optimized = true
   monitoring    = true
 
-  # CKV_AWS_79 (IMDSv2)
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
   }
 
-  # CKV_AWS_8 (EBS encryption)
   root_block_device {
     encrypted = true
   }
@@ -262,21 +225,16 @@ resource "aws_instance" "private1" {
   vpc_security_group_ids      = [aws_security_group.private_sg.id]
   associate_public_ip_address = false
   key_name                    = aws_key_pair.lab_key.key_name
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
 
-  # CKV2_AWS_41
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-
-  # CKV_AWS_135 / CKV_AWS_126
   ebs_optimized = true
   monitoring    = true
 
-  # CKV_AWS_79 (IMDSv2)
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
   }
 
-  # CKV_AWS_8 (EBS encryption)
   root_block_device {
     encrypted = true
   }
@@ -286,24 +244,4 @@ resource "aws_instance" "private1" {
     Project = var.project
     Role    = "private"
   }
-}
-
-# -------------------------
-# Outputs
-# -------------------------
-
-output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
-}
-
-output "private1_ip" {
-  value = aws_instance.private1.private_ip
-}
-
-output "ssh_command" {
-  value = "ssh -i id_rsa ec2-user@${aws_instance.bastion.public_ip}"
-}
-
-output "my_ip_cidr" {
-  value = local.my_ip_cidr
 }
