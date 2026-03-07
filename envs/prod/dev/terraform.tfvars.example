@@ -1,0 +1,3 @@
+project            = "terraform-aws-cloud-network-lab"
+region             = "us-east-1"
+public_key_openssh = "ssh-ed25519 AAAA... your_key_comment"
