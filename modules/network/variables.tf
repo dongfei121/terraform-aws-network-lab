@@ -1,57 +1,47 @@
 variable "project" {
-  description = "Project name used for naming and tagging."
   type        = string
+  description = "The project name"
 }
 
 variable "region" {
-  description = "AWS region."
   type        = string
+  description = "The AWS region"
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for the VPC."
   type        = string
+  description = "The CIDR block for the VPC"
 }
 
 variable "azs" {
-  description = "Availability zones to use."
   type        = list(string)
+  description = "List of availability zones"
 }
 
 variable "public_subnet_cidrs" {
-  description = "CIDR blocks for public subnets."
   type        = list(string)
-
-  validation {
-    condition     = length(var.public_subnet_cidrs) == length(var.azs)
-    error_message = "public_subnet_cidrs must have the same length as azs."
-  }
+  description = "List of CIDRs for the public subnets"
 }
 
 variable "private_subnet_cidrs" {
-  description = "CIDR blocks for private subnets."
   type        = list(string)
-
-  validation {
-    condition     = length(var.private_subnet_cidrs) == length(var.azs)
-    error_message = "private_subnet_cidrs must have the same length as azs."
-  }
+  description = "List of CIDRs for the private subnets"
 }
 
 variable "enable_nat" {
-  description = "Whether to create a NAT Gateway for private subnets."
   type        = bool
+  description = "Whether to enable a NAT gateway for private subnets"
   default     = true
 }
 
-variable "flow_logs_retention_days" {
-  description = "Retention in days for VPC Flow Logs CloudWatch log group."
-  type        = number
-  default     = 365
+variable "tags" {
+  type        = map(string)
+  description = "Common tags to be applied to resources"
+  default     = {}
 }
 
-variable "tags" {
-  description = "Additional tags applied to resources."
-  type        = map(string)
-  default     = {}
+variable "flow_logs_retention_days" {
+  type        = number
+  description = "Retention period for VPC flow logs in CloudWatch"
+  default     = 365
 }

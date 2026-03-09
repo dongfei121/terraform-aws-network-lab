@@ -218,6 +218,13 @@ terraform plan
 6. Apply | 部署资源
 terraform apply
 
+7 Terraform plan examples | Terraform plan 示例
+
+### Dev
+```bash
+terraform -chdir=envs/dev plan
+
+
 Typical outputs | 常见输出
 
 After apply, Terraform outputs useful values such as:
@@ -381,3 +388,14 @@ License | 说明
 
 This project is for learning, lab practice, and portfolio demonstration.
 本项目主要用于学习、实验练习和作品集展示。
+
+## Skills demonstrated | 项目体现的能力
+
+- Terraform module design
+- Multi-environment infrastructure layout
+- AWS VPC networking fundamentals
+- Bastion + private subnet access pattern
+- Remote backend with S3 + DynamoDB
+- Infrastructure validation with GitHub Actions
+- Static analysis with TFLint and Checkov
+- Cost-aware infrastructure design
